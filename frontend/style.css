@@ -460,11 +460,23 @@ body {
 }
 
 .loyer-grad {
-    background: linear-gradient(to right, #10b981, #f59e0b, #ec4899);
+    background: linear-gradient(to right, #10b981, #84cc16, #f59e0b, #f97316, #ec4899);
+}
+
+.loyer-social-plus-grad {
+    background: linear-gradient(to right, #a7f3d0, #34d399, #059669, #064e3b);
+}
+
+.loyer-social-pls-grad {
+    background: linear-gradient(to right, #fed7aa, #fb923c, #ea580c, #7c2d12);
 }
 
 .sru-rate-grad {
     background: linear-gradient(to right, #ef4444, #f59e0b, #22c55e);
+}
+
+.buy-grad {
+    background: linear-gradient(to right, #10b981, #38bdf8, #6366f1, #a855f7, #ec4899);
 }
 
 .legend-labels {
@@ -694,4 +706,119 @@ body {
 .suggestion-item:hover {
     background-color: rgba(56, 189, 248, 0.1);
     color: var(--accent-blue);
+}
+
+/* Custom Multiselect dropdown styling */
+.multiselect-container {
+    position: relative;
+    width: 100%;
+    user-select: none;
+}
+
+.multiselect-select {
+    background-color: #1e293b;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 10px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.multiselect-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #1e293b;
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    padding: 6px 0;
+}
+
+.multiselect-item {
+    padding: 8px 12px;
+    transition: background-color 0.2s ease;
+}
+
+.multiselect-item:hover {
+    background-color: rgba(56, 189, 248, 0.05);
+}
+
+.multiselect-item label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    width: 100%;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: normal;
+}
+
+.multiselect-item input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+}
+
+/* ----------------------------------------------------
+   COMPARATOR UI
+   ---------------------------------------------------- */
+.compare-table {
+    margin-top: 10px;
+}
+.compare-table th, .compare-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: left;
+}
+.compare-table th {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.compare-table tr:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+.compare-item-card {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    text-align: center;
+}
+.compare-item-card h4 {
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+.compare-item-card .remove-btn {
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    background: none;
+    border: none;
+    color: var(--accent-danger);
+    font-size: 14px;
+    cursor: pointer;
+    font-weight: bold;
+    line-height: 1;
+}
+.compare-item-card .remove-btn:hover {
+    color: #ef4444;
 }

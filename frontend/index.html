@@ -44,6 +44,10 @@
                     <span class="stat-label">Tension Moyenne</span>
                     <span id="stat-tension" class="stat-val">-</span>
                 </div>
+                <div class="stat-badge">
+                    <span class="stat-label">Déficit SRU</span>
+                    <span id="stat-sru-deficit" class="stat-val">-</span>
+                </div>
             </div>
         </header>
 
@@ -53,8 +57,9 @@
             <aside class="sidebar">
                 <!-- Tabs for switching between Filters and Simulator -->
                 <div class="tabs">
-                    <button class="tab-btn active" onclick="switchTab('filters')">🔎 Filtres & Cartographie</button>
-                    <button class="tab-btn" onclick="switchTab('simulator')">🧮 Simulateur Ménage</button>
+                    <button class="tab-btn active" onclick="switchTab('filters')">🔎 Filtres & Carto</button>
+                    <button class="tab-btn" onclick="switchTab('simulator')">🧮 Simulateur</button>
+                    <button class="tab-btn" onclick="switchTab('compare')">📊 Comparateur</button>
                 </div>
 
                 <!-- Tab Content: Filters -->
@@ -65,11 +70,16 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="filter-dep">Département</label>
-                        <select id="filter-dep" onchange="applyFilters()">
-                            <option value="">Tous les départements</option>
-                            <option value="75" selected>75 - Paris</option>
-                        </select>
+                        <label>Département(s)</label>
+                        <div class="multiselect-container" id="dep-multiselect">
+                            <div class="multiselect-select" onclick="toggleMultiselect()">
+                                <span class="multiselect-placeholder">75 - Paris</span>
+                                <span class="multiselect-arrow">▼</span>
+                            </div>
+                            <div class="multiselect-dropdown hidden" id="dep-suggestions">
+                                <!-- Checkboxes populated dynamically -->
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -104,6 +114,20 @@
                     </div>
 
                     <div class="form-group">
+                        <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #f1f5f9; font-size: 12px; margin-top: 5px;">
+                            <input type="checkbox" id="filter-sru-deficit" onchange="applyFilters()" style="cursor: pointer; width: auto; margin: 0;">
+                            <span>⚠️ Uniquement en déficit SRU</span>
+                        </label>
+                    </div>
+
+                    <div id="sru-deficit-list-box" class="hidden" style="margin-top: 5px; margin-bottom: 10px;">
+                        <label id="sru-deficit-list-title" style="font-size: 11px; font-weight: 600; color: #94a3b8; display: block; margin-bottom: 4px;">Communes déficitaires (0)</label>
+                        <div id="sru-deficit-list" style="max-height: 150px; overflow-y: auto; font-size: 11px; display: flex; flex-direction: column; gap: 4px; background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="form-group">
                         <label>Coloration de la carte</label>
                         <div class="radio-group">
                             <label class="radio-label">
@@ -119,9 +143,40 @@
                                 <span>Loyer privé (€/m²)</span>
                             </label>
                             <label class="radio-label">
+                                <input type="radio" name="map-color" value="loyer_social_plus" onchange="updateMapColoration()">
+                                <span>Loyer Max Social (PLUS)</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="map-color" value="loyer_social_pls" onchange="updateMapColoration()">
+                                <span>Loyer Max Intermédiaire (PLS)</span>
+                            </label>
+                            <label class="radio-label">
                                 <input type="radio" name="map-color" value="sru_rate" onchange="updateMapColoration()">
                                 <span>Taux de Log. Sociaux (SRU)</span>
                             </label>
+                            <label class="radio-label">
+                                <input type="radio" name="map-color" value="prix_achat" onchange="updateMapColoration()">
+                                <span>Prix d'achat m² (DVF)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 15px;">
+                        <label>Calques additionnels</label>
+                        <div class="checkbox-group" style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px;">
+                            <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #f1f5f9; font-size: 11px;">
+                                <input type="checkbox" id="toggle-grid-layer" onchange="toggleGridLayer()" style="cursor: pointer;">
+                                <span>Carreaux de population 1km² (Filosofi)</span>
+                            </label>
+                        </div>
+                        <div id="grid-control-box" class="hidden" style="margin-top: 10px; padding-left: 20px;">
+                            <label for="grid-color-mode" style="font-size: 10px; color: #94a3b8; display: block; margin-bottom: 4px;">Indicateur des carreaux :</label>
+                            <select id="grid-color-mode" onchange="updateGridColoration()" style="font-size: 11px; padding: 4px 8px; background-color: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 4px;">
+                                <option value="pop">Population</option>
+                                <option value="pauv">Nombre de ménages pauvres</option>
+                                <option value="soc">Nombre de logements sociaux</option>
+                                <option value="snv">Niveau de vie moyen</option>
+                            </select>
                         </div>
                     </div>
                     
@@ -229,6 +284,10 @@
                             <!-- Comment injected dynamically -->
                         </div>
                         
+                        <div id="sim-budget-diagnostic" style="margin-top: 15px; padding: 12px; border-radius: 6px; font-size: 11px; color: #f8fafc; line-height: 1.4; display: flex; flex-direction: column; gap: 6px;">
+                            <!-- Diagnostic injected dynamically -->
+                        </div>
+                        
                         <div class="ceilings-summary">
                             <h5>Détails des plafonds calculés :</h5>
                             <ul>
@@ -237,6 +296,35 @@
                                 <li>Plafond PLS : <span id="ceil-pls">-</span> €</li>
                                 <li>Plafond LLI : <span id="ceil-lli">-</span> €</li>
                             </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Compare -->
+                <div id="tab-compare" class="tab-content">
+                    <div class="section-title">
+                        <h3>Comparateur de communes</h3>
+                        <p>Comparez jusqu'à 3 communes sélectionnées</p>
+                    </div>
+                    
+                    <div id="compare-empty" class="compare-empty-state" style="padding: 30px 15px; text-align: center; color: #94a3b8; border: 1px dashed #334155; border-radius: 6px; font-size: 12px; margin-top: 15px;">
+                        <p>Aucune commune sélectionnée pour comparaison.</p>
+                        <p style="font-size: 11px; color: #64748b; margin-top: 6px;">Sélectionnez une commune sur la carte puis cliquez sur le bouton <strong>"Comparer cette commune"</strong>.</p>
+                    </div>
+                    
+                    <div id="compare-content" class="hidden" style="margin-top: 15px;">
+                        <div id="compare-items" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px;">
+                            <!-- Injected dynamically -->
+                        </div>
+                        
+                        <div class="compare-chart-container" style="height: 180px; position: relative; margin-bottom: 20px;">
+                            <canvas id="compareChart"></canvas>
+                        </div>
+                        
+                        <div class="compare-table-container" style="overflow-x: auto;">
+                            <table class="compare-table" id="compare-table-data" style="width: 100%; font-size: 11px; border-collapse: collapse; color: #f8fafc; border-top: 1px solid #334155;">
+                                <!-- Injected dynamically -->
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -258,6 +346,10 @@
                     <div class="commune-title">
                         <h2 id="det-nom">Commune</h2>
                         <span class="badge-zone" id="det-zone">Zone A bis</span>
+                    </div>
+                    
+                    <div style="margin: 8px 0 12px 0;">
+                        <button class="compare-btn-add" id="add-to-compare-btn" onclick="addToCompare()" style="width: 100%; padding: 6px 12px; font-size: 11px; background-color: #38bdf8; color: #0f172a; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">📊 Comparer cette commune</button>
                     </div>
                     
                     <div class="commune-meta">
@@ -284,6 +376,10 @@
                         <p>Demandes en cours : <strong id="det-demandes">-</strong></p>
                         <p>Attributions annuelles : <strong id="det-attributions">-</strong></p>
                         <p>Statut loi SRU : <span id="det-sru" class="sru-status">-</span></p>
+                        <div id="det-sru-deficit-box" class="hidden" style="margin-top: 10px; padding: 10px; background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 4px; font-size: 11px; color: #fecaca; display: flex; flex-direction: column; gap: 4px;">
+                            <span>⚠️ <strong>Déficit HLM (Loi SRU) :</strong></span>
+                            <span>Il manque environ <strong id="det-sru-manquants" style="color: #ef4444; font-size: 13px;">-</strong> logements sociaux pour atteindre le seuil de 25% requis par la loi.</span>
+                        </div>
                     </div>
 
                     <div class="section-title-sub">
@@ -301,6 +397,16 @@
                     </div>
 
                     <div class="section-title-sub">
+                        <h4>Coût d'achat du logement (DVF 2024)</h4>
+                    </div>
+                    <div class="rent-comparison" style="margin-bottom: 15px;">
+                        <div class="rent-bar" style="border-color: rgba(236, 72, 153, 0.3); background-color: rgba(236, 72, 153, 0.05);">
+                            <div class="rent-bar-label">Prix d'achat Médian (DVF)</div>
+                            <div class="rent-bar-value"><span id="buy-median" style="color: #ec4899;">-</span> €/m²</div>
+                        </div>
+                    </div>
+
+                    <div class="section-title-sub">
                         <h4>Comparaison des Loyers Moyens théoriques</h4>
                     </div>
                     <div class="rent-comparison">
@@ -308,11 +414,19 @@
                             <div class="rent-bar-label">Loyer Privé Estimé</div>
                             <div class="rent-bar-value"><span id="rent-prive">-</span> €/m²</div>
                         </div>
-                        <div class="rent-bar social">
-                            <div class="rent-bar-label">Loyer PLUS Moyen (HLM)</div>
-                            <div class="rent-bar-value"><span id="rent-social">7.20</span> €/m²</div>
+                        <div class="rent-bar social plai">
+                            <div class="rent-bar-label">Loyer Max PLAI (Très social)</div>
+                            <div class="rent-bar-value"><span id="rent-max-plai">-</span> €/m²</div>
                         </div>
-                        <p class="rent-info-text">Le loyer social PLUS est d'environ 6.50 à 8.00 €/m² en IDF hors charges. Le loyer LLI (intermédiaire) est plafonné à environ 15 à 19 €/m² selon la zone.</p>
+                        <div class="rent-bar social plus">
+                            <div class="rent-bar-label">Loyer Max PLUS (HLM classique)</div>
+                            <div class="rent-bar-value"><span id="rent-max-plus">-</span> €/m²</div>
+                        </div>
+                        <div class="rent-bar social pls">
+                            <div class="rent-bar-label">Loyer Max PLS (Social sup)</div>
+                            <div class="rent-bar-value"><span id="rent-max-pls">-</span> €/m²</div>
+                        </div>
+                        <p class="rent-info-text">Les loyers maximaux ci-dessus sont exprimés hors charges en surface utile (valeurs réglementaires 2026).</p>
                     </div>
                 </div>
             </aside>

@@ -26,6 +26,45 @@ def estimate_private_rent(row):
     else:
         return 11.0
 
+def compute_max_rents(row):
+    zone_abc = row.get('zone_abc') or 'B1'
+    zone_sociale = row.get('zone_sociale') or 'Province'
+    
+    # PLS rents based on zone_abc
+    pls_rents = {
+        'A bis': 15.32, 'Abis': 15.32,
+        'A': 11.80,
+        'B1': 10.17,
+        'B2': 9.74,
+        'C': 9.03
+    }
+    loyer_pls = pls_rents.get(zone_abc, 10.17)
+    
+    # PLAI and PLUS max rents based on zone sociale (I bis, I, II, III)
+    if zone_sociale == 'Paris' or zone_sociale == 'Paris et communes limitrophes':
+        loyer_plai = 7.00
+        loyer_plus = 7.85
+    elif zone_sociale == 'Île-de-France hors Paris':
+        if zone_abc in ['A bis', 'Abis']:
+            loyer_plai = 7.00
+            loyer_plus = 7.85
+        elif zone_abc == 'A':
+            loyer_plai = 6.57
+            loyer_plus = 7.40
+        else: # B1/B2
+            loyer_plai = 5.77
+            loyer_plus = 6.49
+    else:
+        # Province / hors IDF
+        if zone_abc in ['A', 'B1']:
+            loyer_plai = 5.77
+            loyer_plus = 6.49
+        else: # B2/C
+            loyer_plai = 5.33
+            loyer_plus = 6.01
+            
+    return pd.Series([loyer_plai, loyer_plus, loyer_pls])
+
 def run_etl():
     print("=== STARTING NATIONWIDE ETL PIPELINE ===")
     
@@ -49,6 +88,19 @@ def run_etl():
         'LIBGEO': 'nom_commune'
     })[['code_commune', 'nom_commune', 'departement', 'zone_abc']]
     print(f"Loaded {len(df_abc)} communes in France.")
+    
+    # Paris Arrondissements duplication check: liste-des-communes-zonage-abc only has 75056.
+    # We duplicate it for the 20 arrondissements (75101 to 75120)
+    paris_rows = []
+    for i in range(1, 21):
+        code = f"751{str(i).zfill(2)}"
+        paris_rows.append({
+            'code_commune': code,
+            'nom_commune': f"Paris {i}e Arrondissement" if i > 1 else "Paris 1er Arrondissement",
+            'departement': '75',
+            'zone_abc': 'Abis'
+        })
+    df_abc = pd.concat([df_abc, pd.DataFrame(paris_rows)], ignore_index=True)
     
     # Determine Zone Sociale
     def determine_zone_sociale(row):
@@ -87,6 +139,62 @@ def run_etl():
     
     df_sru = df_sru[['code_commune', 'taux_sru', 'commune_deficitaire_sru']]
     
+    # Duplicate SRU status for Paris arrondissements (they share Paris' SRU rules)
+    paris_sru_row = df_sru[df_sru['code_commune'] == '75056']
+    if not paris_sru_row.empty:
+        paris_rate = paris_sru_row.iloc[0]['taux_sru']
+        paris_def = paris_sru_row.iloc[0]['commune_deficitaire_sru']
+        paris_arr_sru = []
+        for i in range(1, 21):
+            paris_arr_sru.append({
+                'code_commune': f"751{str(i).zfill(2)}",
+                'taux_sru': paris_rate,
+                'commune_deficitaire_sru': paris_def
+            })
+        df_sru = pd.concat([df_sru, pd.DataFrame(paris_arr_sru)], ignore_index=True)
+    
+    # 2b. Load & Aggregate DVF Real Estate Sales (2024)
+    print("2b/6 Aggregating DVF 2024 Transaction Prices using DuckDB...")
+    dvf_path = glob.glob(f"{sources_dir}/ValeursFoncieres-2024.txt")[0]
+    
+    dvf_con = duckdb.connect()
+    dvf_query = f"""
+        WITH raw_data AS (
+            SELECT 
+                "Code departement" AS dep,
+                "Code commune" AS comm,
+                TRY_CAST(REPLACE("Valeur fonciere", ',', '.') AS DOUBLE) AS price,
+                TRY_CAST("Surface reelle bati" AS DOUBLE) AS surface
+            FROM read_csv_auto('{dvf_path}', delim='|', header=True, all_varchar=True)
+            WHERE "Nature mutation" = 'Vente'
+              AND "Type local" IN ('Appartement', 'Maison')
+              AND "Valeur fonciere" IS NOT NULL
+              AND "Surface reelle bati" IS NOT NULL
+        ),
+        cleaned_data AS (
+            SELECT 
+                CASE 
+                    WHEN LENGTH(dep) = 3 THEN dep || LPAD(comm, 2, '0')
+                    ELSE LPAD(dep, 2, '0') || LPAD(comm, 3, '0')
+                END AS code_commune,
+                price,
+                surface,
+                price / surface AS price_m2
+            FROM raw_data
+            WHERE surface >= 10
+              AND price >= 5000 AND price <= 5000000
+        )
+        SELECT 
+            code_commune,
+            MEDIAN(price_m2) AS prix_achat_m2_median,
+            AVG(price_m2) AS prix_achat_m2_moyen
+        FROM cleaned_data
+        WHERE price_m2 >= 200 AND price_m2 <= 30000
+        GROUP BY code_commune
+    """
+    df_dvf = dvf_con.execute(dvf_query).df()
+    print(f"DVF aggregated for {len(df_dvf)} communes.")
+    
     # 3. Load Demands & Attributions (IDF specific, we map to 75056 and default others)
     print("3/6 Loading Demands and Attributions (IDF)...")
     dem_path = glob.glob(f"{sources_dir}/socle_demandes_attributions_2024.xlsx")[0]
@@ -115,15 +223,16 @@ def run_etl():
     for r in rows_iter:
         if r[0] == 'Commune':
             code = str(r[1]).zfill(5)
-            if code.startswith('75'):
-                code = '75056'
-            # Note: dem Excel sheet has only 8 IDF departments
+            # Accept all communes, including Paris arrondissements (e.g. 75101 to 75120)
             dem_data.append({
                 'code_commune': code,
                 'epci': r[6],
                 'demandes_total': clean_numeric(r[9]),
                 'attributions_total': clean_numeric(r[13])
             })
+        elif r[0] in ['Dï¿½partement', 'Dï¿½partement ', 'Département', 'Dpartement'] and str(r[1]) == '75':
+            # Skip the Paris general department row since we are mapping by individual arrondissements now
+            continue
                 
     df_dem = pd.DataFrame(dem_data)
     df_dem = df_dem.groupby('code_commune').agg({
@@ -146,7 +255,7 @@ def run_etl():
     # Remove department filter to aggregate nationwide
     rpls_agg_query = f"""
         SELECT 
-            CASE WHEN DEPCOM LIKE '75%' THEN '75056' ELSE LPAD(CAST(DEPCOM AS VARCHAR), 5, '0') END as code_commune,
+            LPAD(CAST(DEPCOM AS VARCHAR), 5, '0') as code_commune,
             COUNT(*) as logements_sociaux_total,
             SUM(CASE WHEN FINAN_CODE = '11' THEN 1 ELSE 0 END) as logements_plai,
             SUM(CASE WHEN FINAN_CODE IN ('12', '13', '52') THEN 1 ELSE 0 END) as logements_plus,
@@ -178,7 +287,9 @@ def run_etl():
     for feature in geo_data['features']:
         props = feature['properties']
         code_commune = str(props.get('code', '')).zfill(5)
-        if code_commune.startswith('75') and code_commune != '75056':
+        # Keep all features including Paris Arrondissements. Only exclude the 75056 master polygon 
+        # to avoid overlapping layers on map (arranged by arrondissements now).
+        if code_commune == '75056':
             continue
         dep = str(props.get('departement', '')).zfill(2)
         
@@ -221,6 +332,7 @@ def run_etl():
     df_final = df_abc.merge(df_dem, on='code_commune', how='left')
     df_final = df_final.merge(df_rpls, on='code_commune', how='left')
     df_final = df_final.merge(df_sru, on='code_commune', how='left')
+    df_final = df_final.merge(df_dvf, on='code_commune', how='left')
     
     # Fill NAs
     fill_zero_cols = [
@@ -233,6 +345,9 @@ def run_etl():
     
     # Estimate private rents
     df_final['loyer_prive_m2'] = df_final.apply(estimate_private_rent, axis=1)
+    
+    # Estimate regulatory max social rents (PLAI, PLUS, PLS)
+    df_final[['loyer_max_plai', 'loyer_max_plus', 'loyer_max_pls']] = df_final.apply(compute_max_rents, axis=1)
     
     # Map geometry
     df_final['geometry_json'] = df_final['code_commune'].map(geom_map)
@@ -266,6 +381,12 @@ def run_etl():
         
     db_df.to_sql('indicateurs_communes_idf', con=engine, if_exists='replace', index=False)
     
+    # SQLite indexing
+    if is_sqlite:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS idx_communes_code ON indicateurs_communes_idf(code_commune);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_communes_dep ON indicateurs_communes_idf(departement);"))
+            
     # PostGIS geometry update if postgres
     if not is_sqlite:
         with engine.begin() as conn:

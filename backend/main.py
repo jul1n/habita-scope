@@ -1,7 +1,8 @@
 import os
 import json
+from functools import lru_cache
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, text
@@ -75,6 +76,11 @@ class CommuneLight(BaseModel):
     taux_sru: Optional[float] = None
     commune_deficitaire_sru: bool
     loyer_prive_m2: Optional[float] = None
+    loyer_max_plai: Optional[float] = None
+    loyer_max_plus: Optional[float] = None
+    loyer_max_pls: Optional[float] = None
+    prix_achat_m2_median: Optional[float] = None
+    prix_achat_m2_moyen: Optional[float] = None
 
 class CommuneDetail(CommuneLight):
     logements_plai: int
@@ -85,6 +91,7 @@ class CommuneDetail(CommuneLight):
     logements_t3: int
     logements_t4: int
     logements_t5_plus: int
+    logements_manquants_sru: Optional[int] = None
 
 class SimulationInput(BaseModel):
     adults: int = Field(..., ge=1, description="Nombre d'adultes")
@@ -142,22 +149,42 @@ def get_communes(db: Session = Depends(get_db)):
     query = text("""
         SELECT code_commune, nom_commune, departement, epci, zone_abc, zone_sociale, 
                logements_sociaux_total, demandes_total, attributions_total, 
-               ratio_demandes_attributions, taux_sru, commune_deficitaire_sru, loyer_prive_m2
+               ratio_demandes_attributions, taux_sru, commune_deficitaire_sru, loyer_prive_m2,
+               loyer_max_plai, loyer_max_plus, loyer_max_pls, prix_achat_m2_median, prix_achat_m2_moyen
         FROM indicateurs_communes_idf
         ORDER BY nom_commune
     """)
     result = db.execute(query).fetchall()
     return [row_to_dict(r) for r in result]
 
+@lru_cache(maxsize=32)
+def load_geojson_file(path: str):
+    if not os.path.exists(path):
+        return None
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
 @app.get("/communes/geojson/{dep_code}")
-def get_communes_geojson(dep_code: str):
+def get_communes_geojson(dep_code: str, response: Response):
     """Retourne la géométrie simplifiée de toutes les communes d'un département."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     dep_clean = dep_code.zfill(2)
     geojson_path = os.path.abspath(os.path.join(backend_dir, f"../processed/geometries/{dep_clean}.geojson"))
-    if not os.path.exists(geojson_path):
+    data = load_geojson_file(geojson_path)
+    if data is None:
         raise HTTPException(status_code=404, detail=f"GeoJSON file for department {dep_clean} not found.")
-    with open(geojson_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    return data
+
+@app.get("/communes/grid-geojson/{dep_code}")
+def get_grid_geojson(dep_code: str, response: Response):
+    """Retourne les carreaux Filosofi 1km pour un département."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    dep_clean = dep_code.zfill(2)
+    geojson_path = os.path.abspath(os.path.join(backend_dir, f"../processed/geometries/grid_{dep_clean}.geojson"))
+    data = load_geojson_file(geojson_path)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"Grid GeoJSON file for department {dep_clean} not found.")
+    return data
 
 @app.get("/communes/{code_commune}", response_model=CommuneDetail)
 def get_commune(code_commune: str, db: Session = Depends(get_db)):
@@ -170,7 +197,19 @@ def get_commune(code_commune: str, db: Session = Depends(get_db)):
     result = db.execute(query, {"code": code_commune.zfill(5)}).fetchone()
     if not result:
         raise HTTPException(status_code=404, detail=f"Commune {code_commune} introuvable.")
-    return row_to_dict(result)
+    
+    commune_dict = row_to_dict(result)
+    taux_sru = commune_dict.get('taux_sru')
+    sociaux = commune_dict.get('logements_sociaux_total') or 0
+    if taux_sru and taux_sru > 0 and taux_sru < 0.25:
+        res_principales = sociaux / taux_sru
+        target_sociaux = res_principales * 0.25
+        manquants = max(0, int(target_sociaux - sociaux))
+        commune_dict['logements_manquants_sru'] = manquants
+    else:
+        commune_dict['logements_manquants_sru'] = 0
+        
+    return commune_dict
 
 @app.get("/indicateurs")
 def get_global_indicators(db: Session = Depends(get_db)):

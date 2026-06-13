@@ -6,6 +6,8 @@ __pycache__/
 # Databases & local builds
 processed/*.db
 processed/*.sqlite
+processed/*.parquet
+*.parquet
 
 # Environment variables
 .env
