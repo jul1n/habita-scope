@@ -149,12 +149,13 @@ def get_communes(db: Session = Depends(get_db)):
     result = db.execute(query).fetchall()
     return [row_to_dict(r) for r in result]
 
-@app.get("/communes/geojson")
-def get_communes_geojson():
-    """Retourne la géométrie simplifiée de toutes les communes d'IDF."""
-    geojson_path = os.path.abspath(os.path.join(backend_dir, "../processed/communes_idf.geojson"))
+@app.get("/communes/geojson/{dep_code}")
+def get_communes_geojson(dep_code: str):
+    """Retourne la géométrie simplifiée de toutes les communes d'un département."""
+    dep_clean = dep_code.zfill(2)
+    geojson_path = os.path.abspath(os.path.join(backend_dir, f"../processed/geometries/{dep_clean}.geojson"))
     if not os.path.exists(geojson_path):
-        raise HTTPException(status_code=404, detail="GeoJSON file not found. Run the ETL script first.")
+        raise HTTPException(status_code=404, detail=f"GeoJSON file for department {dep_clean} not found.")
     with open(geojson_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
@@ -197,7 +198,7 @@ def simulate_eligibility(input_data: SimulationInput, db: Session = Depends(get_
     """Simule l'éligibilité théorique d'un ménage."""
     # 1. Fetch target commune data
     query = text("""
-        SELECT nom_commune, zone_abc, ratio_demandes_attributions, 
+        SELECT nom_commune, zone_abc, ratio_demandes_attributions, zone_sociale,
                logements_plai, logements_plus, logements_pls, logements_sociaux_total,
                logements_t1, logements_t2, logements_t3, logements_t4, logements_t5_plus
         FROM indicateurs_communes_idf
@@ -209,6 +210,7 @@ def simulate_eligibility(input_data: SimulationInput, db: Session = Depends(get_
         
     commune_dict = row_to_dict(commune)
     zone_abc = commune_dict['zone_abc'] or "B1"
+    zone_sociale = commune_dict.get('zone_sociale', 'Province')
     
     # 2. Determine Household Category index (1 to 6+)
     # Base size of household
@@ -240,7 +242,9 @@ def simulate_eligibility(input_data: SimulationInput, db: Session = Depends(get_
         category += 1
         
     # 3. Lookup HLM (Social) Ceilings
-    social_ceilings = CEILINGS_DATA['social']['plafonds']
+    is_idf = (zone_sociale != "Province")
+    social_grid_key = "IDF" if is_idf else "province"
+    social_ceilings = CEILINGS_DATA['social']['zones'][social_grid_key]
     
     def get_social_ceiling(grid_name, cat):
         grid = social_ceilings[grid_name]

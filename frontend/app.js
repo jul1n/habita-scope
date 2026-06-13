@@ -1,19 +1,43 @@
 // ----------------------------------------------------
-// GLOBAL STATE
+// GLOBAL STATE & CONSTANTS
 // ----------------------------------------------------
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://127.0.0.1:8000'
-    : ''; // Empty for relative calls when deployed behind Nginx
+    : '';
 
 let map = null;
 let communesData = []; // Light JSON commune indicator list
-let communesGeoJSON = null; // GeoJSON shapes
+let communesGeoJSON = null; // GeoJSON shapes currently loaded
 let globalStats = null;
 let selectedCommuneCode = null;
 
 // Chart.js Instances
 let fundingChartInstance = null;
 let typologyChartInstance = null;
+
+const DEP_NAMES = {
+    '01': 'Ain', '02': 'Aisne', '03': 'Allier', '04': 'Alpes-de-Haute-Provence', '05': 'Hautes-Alpes',
+    '06': 'Alpes-Maritimes', '07': 'Ardèche', '08': 'Ardennes', '09': 'Ariège', '10': 'Aube',
+    '11': 'Aude', '12': 'Aveyron', '13': 'Bouches-du-Rhône', '14': 'Calvados', '15': 'Cantal',
+    '16': 'Charente', '17': 'Charente-Maritime', '18': 'Cher', '19': 'Corrèze', '2A': 'Corse-du-Sud',
+    '2B': 'Haute-Corse', '21': "Côte-d'Or", '22': "Côtes-d'Armor", '23': 'Creuse', '24': 'Dordogne',
+    '25': 'Doubs', '26': 'Drôme', '27': 'Eure', '28': 'Eure-et-Loir', '29': 'Finistère',
+    '30': 'Gard', '31': 'Haute-Garonne', '32': 'Gers', '33': 'Gironde', '34': 'Hérault',
+    '35': 'Ille-et-Vilaine', '36': 'Indre', '37': 'Indre-et-Loire', '38': 'Isère', '39': 'Jura',
+    '40': 'Landes', '41': 'Loir-et-Cher', '42': 'Loire', '43': 'Haute-Loire', '44': 'Loire-Atlantique',
+    '45': 'Loiret', '46': 'Lot', '47': 'Lot-et-Garonne', '48': 'Lozère', '49': 'Maine-et-Loire',
+    '50': 'Manche', '51': 'Marne', '52': 'Haute-Marne', '53': 'Mayenne', '54': 'Meurthe-et-Moselle',
+    '55': 'Meuse', '56': 'Morbihan', '57': 'Moselle', '58': 'Nièvre', '59': 'Nord',
+    '60': 'Oise', '61': 'Orne', '62': 'Pas-de-Calais', '63': 'Puy-de-Dôme', '64': 'Pyrénées-Atlantiques',
+    '65': 'Hautes-Pyrénées', '66': 'Pyrénées-Orientales', '67': 'Bas-Rhin', '68': 'Haut-Rhin', '69': 'Rhône',
+    '70': 'Haute-Saône', '71': 'Saône-et-Loire', '72': 'Sarthe', '73': 'Savoie', '74': 'Haute-Savoie',
+    '75': 'Paris', '76': 'Seine-Maritime', '77': 'Seine-et-Marne', '78': 'Yvelines', '79': 'Deux-Sèvres',
+    '80': 'Somme', '81': 'Tarn', '82': 'Tarn-et-Garonne', '83': 'Var', '84': 'Vaucluse',
+    '85': 'Vendée', '86': 'Vienne', '87': 'Haute-Vienne', '88': 'Vosges', '89': 'Yonne',
+    '90': 'Territoire de Belfort', '91': 'Essonne', '92': 'Hauts-de-Seine', '93': 'Seine-Saint-Denis', '94': 'Val-de-Marne',
+    '95': "Val-d'Oise", '971': 'Guadeloupe', '972': 'Martinique', '973': 'Guyane', '974': 'La Réunion',
+    '976': 'Mayotte'
+};
 
 // ----------------------------------------------------
 // INITIALIZATION
@@ -28,14 +52,12 @@ async function initApp() {
         await fetchGlobalStats();
         await fetchCommunesList();
         
-        // 2. Initialize MapLibre
-        initMap();
-        
-        // 3. Populate Simulator Select Options
+        // 2. Populate Dropdowns
+        populateDepartmentDropdown();
         populateCommuneDropdown();
         
-        // 4. Hide Map Loader Overlay once loaded
-        document.getElementById("map-loading").classList.add("hidden");
+        // 3. Initialize MapLibre
+        initMap();
     } catch (err) {
         console.error("Error during application initialization:", err);
         alert("Erreur lors de l'initialisation de l'application. Vérifiez que l'API backend tourne.");
@@ -64,6 +86,25 @@ async function fetchCommunesList() {
     communesData = await res.json();
 }
 
+function populateDepartmentDropdown() {
+    const select = document.getElementById("filter-dep");
+    select.innerHTML = ''; // Clear hardcoded ones
+    
+    // Extract unique departments from the dataset
+    const deps = [...new Set(communesData.map(c => c.departement))].sort((a, b) => a.localeCompare(b));
+    
+    deps.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d;
+        const name = DEP_NAMES[d] ? `${d} - ${DEP_NAMES[d]}` : `${d}`;
+        opt.innerText = name;
+        if (d === '75') {
+            opt.selected = true; // Default to Paris
+        }
+        select.appendChild(opt);
+    });
+}
+
 function populateCommuneDropdown() {
     const select = document.getElementById("sim-commune");
     select.innerHTML = '<option value="">Sélectionnez une commune...</option>';
@@ -82,20 +123,102 @@ function populateCommuneDropdown() {
 // TAB MANAGEMENT
 // ----------------------------------------------------
 function switchTab(tabId) {
-    // Buttons
     document.querySelectorAll(".tab-btn").forEach(btn => {
         btn.classList.remove("active");
     });
-    // Find clicked button
     const activeBtn = Array.from(document.querySelectorAll(".tab-btn")).find(btn => 
         btn.getAttribute("onclick").includes(tabId)
     );
     if (activeBtn) activeBtn.classList.add("active");
 
-    // Content panels
     document.getElementById("tab-filters").classList.remove("active");
     document.getElementById("tab-simulator").classList.remove("active");
     document.getElementById(`tab-${tabId}`).classList.add("active");
+}
+
+// ----------------------------------------------------
+// DYNAMIC GEOJSON LAYER LOADER
+// ----------------------------------------------------
+async function loadDepartmentGeometry(depCode) {
+    if (!map) return;
+    
+    // Show loading spinner
+    document.getElementById("map-loading").classList.remove("hidden");
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/communes/geojson/${depCode}`);
+        if (!response.ok) {
+            throw new Error(`Department geometry ${depCode} not found on server.`);
+        }
+        communesGeoJSON = await response.json();
+        
+        // Join tabular indicators with GeoJSON properties
+        const indicatorsMap = {};
+        communesData.forEach(c => {
+            if (c.departement === depCode) {
+                indicatorsMap[c.code_commune] = c;
+            }
+        });
+        
+        communesGeoJSON.features.forEach(f => {
+            const code = f.properties.code_commune;
+            const data = indicatorsMap[code];
+            if (data) {
+                f.properties = { ...f.properties, ...data };
+            } else {
+                f.properties.logements_sociaux_total = 0;
+                f.properties.ratio_demandes_attributions = 0;
+                f.properties.loyer_prive_m2 = 12;
+                f.properties.nom_commune = "Inconnue";
+            }
+        });
+
+        // Set source data
+        const source = map.getSource('communes-idf');
+        if (source) {
+            source.setData(communesGeoJSON);
+        }
+        
+        // Zoom and center map bounds to fit the loaded department
+        fitMapToGeoJSON();
+        
+    } catch (e) {
+        console.error("Failed to load department geometry:", e);
+    } finally {
+        document.getElementById("map-loading").classList.add("hidden");
+    }
+}
+
+function fitMapToGeoJSON() {
+    if (!communesGeoJSON || communesGeoJSON.features.length === 0) return;
+    
+    let minX = 180, minY = 90, maxX = -180, maxY = -90;
+    
+    communesGeoJSON.features.forEach(f => {
+        if (!f.geometry || !f.geometry.coordinates) return;
+        
+        const processCoords = (coords) => {
+            if (typeof coords[0] === 'number') {
+                const x = coords[0];
+                const y = coords[1];
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+            } else {
+                coords.forEach(processCoords);
+            }
+        };
+        
+        processCoords(f.geometry.coordinates);
+    });
+    
+    if (minX < maxX && minY < maxY) {
+        map.fitBounds([minX, minY, maxX, maxY], {
+            padding: 40,
+            maxZoom: 11
+        });
+    }
 }
 
 // ----------------------------------------------------
@@ -105,125 +228,94 @@ function initMap() {
     map = new maplibregl.Map({
         container: 'map',
         style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-        center: [2.3522, 48.8566], // Center on Paris
+        center: [2.3522, 48.8566], // Default center Paris
         zoom: 9,
-        minZoom: 8,
-        maxZoom: 13
+        minZoom: 4,
+        maxZoom: 14
     });
 
     map.addControl(new maplibregl.NavigationControl(), 'top-left');
 
     map.on('load', async () => {
-        // Fetch GeoJSON shapes
-        try {
-            const response = await fetch(`${API_BASE_URL}/communes/geojson`);
-            communesGeoJSON = await response.json();
-            
-            // Enrich GeoJSON properties with communal indicator data for fast client-side styling
-            const indicatorsMap = {};
-            communesData.forEach(c => {
-                indicatorsMap[c.code_commune] = c;
-            });
-            
-            communesGeoJSON.features.forEach(f => {
-                const code = f.properties.code_commune;
-                const data = indicatorsMap[code];
-                if (data) {
-                    f.properties = { ...f.properties, ...data };
-                } else {
-                    f.properties.logements_sociaux_total = 0;
-                    f.properties.ratio_demandes_attributions = 0;
-                    f.properties.loyer_prive_m2 = 15;
-                    f.properties.nom_commune = "Inconnue";
-                }
-            });
+        // Add empty source first
+        map.addSource('communes-idf', {
+            type: 'geojson',
+            data: { type: "FeatureCollection", features: [] }
+        });
 
-            // Add source
-            map.addSource('communes-idf', {
-                type: 'geojson',
-                data: communesGeoJSON
-            });
+        // Add fill layer
+        map.addLayer({
+            id: 'communes-fill',
+            type: 'fill',
+            source: 'communes-idf',
+            paint: {
+                'fill-color': getMapColorExpression('tension'),
+                'fill-opacity': 0.65
+            }
+        });
 
-            // Add fill layer
-            map.addLayer({
-                id: 'communes-fill',
-                type: 'fill',
-                source: 'communes-idf',
-                paint: {
-                    'fill-color': getMapColorExpression('tension'),
-                    'fill-opacity': 0.65
-                }
-            });
+        // Add outline layer for hover highlight
+        map.addLayer({
+            id: 'communes-line',
+            type: 'line',
+            source: 'communes-idf',
+            paint: {
+                'line-color': '#38bdf8',
+                'line-width': [
+                    'case',
+                    ['boolean', ['feature-state', 'hover'], false],
+                    2,
+                    0.3
+                ],
+                'line-opacity': [
+                    'case',
+                    ['boolean', ['feature-state', 'hover'], false],
+                    0.9,
+                    0.3
+                ]
+            }
+        });
 
-            // Add outline layer for hover highlight
-            map.addLayer({
-                id: 'communes-line',
-                type: 'line',
-                source: 'communes-idf',
-                paint: {
-                    'line-color': '#38bdf8',
-                    'line-width': [
-                        'case',
-                        ['boolean', ['feature-state', 'hover'], false],
-                        2,
-                        0.3
-                    ],
-                    'line-opacity': [
-                        'case',
-                        ['boolean', ['feature-state', 'hover'], false],
-                        0.9,
-                        0.3
-                    ]
-                }
-            });
+        // Load default department (75 - Paris)
+        await loadDepartmentGeometry('75');
 
-            // Interaction events
-            let hoveredFeatureId = null;
+        // Interaction events
+        let hoveredFeatureId = null;
 
-            map.on('mousemove', 'communes-fill', (e) => {
-                if (e.features.length > 0) {
-                    if (hoveredFeatureId !== null) {
-                        map.setFeatureState(
-                            { source: 'communes-idf', id: hoveredFeatureId },
-                            { hover: false }
-                        );
-                    }
-                    // For GeoJSON features, ID is often indices if not explicitly set
-                    hoveredFeatureId = e.features[0].id || e.features[0].properties.code_commune;
-                    
-                    // Workaround: set state on feature with matching code_commune
-                    // Find actual feature ID in source (which MapLibre maps internally)
-                    // If no explicit ID, MapLibre assigns internal id which is in e.features[0].id
-                    if (e.features[0].id !== undefined) {
-                        map.setFeatureState(
-                            { source: 'communes-idf', id: e.features[0].id },
-                            { hover: true }
-                        );
-                        hoveredFeatureId = e.features[0].id;
-                    }
-                }
-            });
-
-            map.on('mouseleave', 'communes-fill', () => {
+        map.on('mousemove', 'communes-fill', (e) => {
+            if (e.features.length > 0) {
                 if (hoveredFeatureId !== null) {
                     map.setFeatureState(
                         { source: 'communes-idf', id: hoveredFeatureId },
                         { hover: false }
                     );
                 }
-                hoveredFeatureId = null;
-            });
-
-            map.on('click', 'communes-fill', (e) => {
-                if (e.features.length > 0) {
-                    const code = e.features[0].properties.code_commune;
-                    showCommuneDetails(code);
+                if (e.features[0].id !== undefined) {
+                    map.setFeatureState(
+                        { source: 'communes-idf', id: e.features[0].id },
+                        { hover: true }
+                    );
+                    hoveredFeatureId = e.features[0].id;
                 }
-            });
+            }
+        });
 
-        } catch (e) {
-            console.error("Failed to load map data layers:", e);
-        }
+        map.on('mouseleave', 'communes-fill', () => {
+            if (hoveredFeatureId !== null) {
+                map.setFeatureState(
+                    { source: 'communes-idf', id: hoveredFeatureId },
+                    { hover: false }
+                );
+            }
+            hoveredFeatureId = null;
+        });
+
+        map.on('click', 'communes-fill', (e) => {
+            if (e.features.length > 0) {
+                const code = e.features[0].properties.code_commune;
+                showCommuneDetails(code);
+            }
+        });
     });
 }
 
@@ -304,12 +396,18 @@ function applyFilters() {
     const abcVal = document.getElementById("filter-abc").value;
     const tensionVal = document.getElementById("filter-tension").value;
     
+    // Check if department changed
+    if (depVal && communesGeoJSON && communesGeoJSON.features.length > 0) {
+        const currentGeomDep = communesGeoJSON.features[0].properties.departement;
+        if (currentGeomDep !== depVal) {
+            // Dynamically load the shapes of the newly selected department
+            loadDepartmentGeometry(depVal);
+            return;
+        }
+    }
+    
     // Build MapLibre filter expression
     let expressions = ['all'];
-    
-    if (depVal) {
-        expressions.push(['==', ['get', 'departement'], depVal]);
-    }
     
     if (abcVal) {
         expressions.push(['==', ['get', 'zone_abc'], abcVal]);
@@ -396,7 +494,6 @@ function displaySimulationResult(result) {
     const resultBox = document.getElementById("simulation-result");
     resultBox.classList.remove("hidden");
     
-    // Toggle badges
     const setupBadge = (id, isEligible) => {
         const badge = document.getElementById(id);
         const icon = badge.querySelector(".badge-icon");
@@ -414,21 +511,28 @@ function displaySimulationResult(result) {
     setupBadge("badge-pls", result.eligible_pls);
     setupBadge("badge-lli", result.eligible_lli);
     
-    // Inject comment
     document.getElementById("result-comment").innerText = result.commentaire;
     
-    // Inject ceilings
     document.getElementById("ceil-plai").innerText = result.plafond_plai.toLocaleString('fr-FR');
     document.getElementById("ceil-plus").innerText = result.plafond_plus.toLocaleString('fr-FR');
     document.getElementById("ceil-pls").innerText = result.plafond_pls.toLocaleString('fr-FR');
     document.getElementById("ceil-lli").innerText = result.plafond_lli.toLocaleString('fr-FR');
     
-    // Scroll simulation panel to results
     resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     
-    // Automatically fly map and open detailed commune sheet
-    if (map) {
-        showCommuneDetails(document.getElementById("sim-commune").value);
+    // Extract department from selected commune code (first 2 digits)
+    const targetCommuneCode = document.getElementById("sim-commune").value;
+    const targetDep = targetCommuneCode.substring(0, 2);
+    
+    // Automatically select the department in the filter select dropdown and load geometry if different
+    const depSelect = document.getElementById("filter-dep");
+    if (depSelect.value !== targetDep) {
+        depSelect.value = targetDep;
+        loadDepartmentGeometry(targetDep).then(() => {
+            showCommuneDetails(targetCommuneCode);
+        });
+    } else {
+        showCommuneDetails(targetCommuneCode);
     }
 }
 
@@ -442,22 +546,19 @@ async function showCommuneDetails(code_commune) {
         const res = await fetch(`${API_BASE_URL}/communes/${code_commune}`);
         const c = await res.json();
         
-        // Show panel
         const panel = document.getElementById("details-panel");
         panel.classList.remove("hidden");
         
-        // Fill fields
         document.getElementById("det-nom").innerText = c.nom_commune;
         document.getElementById("det-zone").innerText = `Zone ${c.zone_abc}`;
         document.getElementById("det-code").innerText = c.code_commune;
         document.getElementById("det-dep").innerText = c.departement;
-        document.getElementById("det-epci").innerText = c.epci || "Non rattaché";
+        document.getElementById("det-epci").innerText = c.epci || "Non renseigné";
         document.getElementById("det-sociaux").innerText = c.logements_sociaux_total.toLocaleString('fr-FR');
-        document.getElementById("det-ratio").innerText = c.ratio_demandes_attributions.toFixed(1);
-        document.getElementById("det-demandes").innerText = c.demandes_total.toLocaleString('fr-FR');
-        document.getElementById("det-attributions").innerText = c.attributions_total.toLocaleString('fr-FR');
+        document.getElementById("det-ratio").innerText = c.ratio_demandes_attributions > 0 ? c.ratio_demandes_attributions.toFixed(1) : "N/A";
+        document.getElementById("det-demandes").innerText = c.demandes_total > 0 ? c.demandes_total.toLocaleString('fr-FR') : "N/A (Hors IdF)";
+        document.getElementById("det-attributions").innerText = c.attributions_total > 0 ? c.attributions_total.toLocaleString('fr-FR') : "N/A (Hors IdF)";
         
-        // Clean SRU Label
         const sruSpan = document.getElementById("det-sru");
         if (c.taux_sru !== null) {
             const pct = (c.taux_sru * 100).toFixed(1);
@@ -468,17 +569,14 @@ async function showCommuneDetails(code_commune) {
             sruSpan.className = 'sru-status ok';
         }
         
-        // Rents
         document.getElementById("rent-prive").innerText = c.loyer_prive_m2.toFixed(2);
         
-        // Build / Update Charts
         buildCharts(c);
         
-        // Zoom/Center Map on clicked Commune
+        // Fly map to selected commune
         if (map && communesGeoJSON) {
             const feature = communesGeoJSON.features.find(f => f.properties.code_commune === code_commune);
             if (feature && feature.geometry) {
-                // Compute bounds or center
                 const coords = feature.geometry.coordinates;
                 let center = null;
                 if (feature.geometry.type === 'Polygon') {
@@ -507,7 +605,6 @@ function closeDetailsPanel() {
     selectedCommuneCode = null;
 }
 
-// Simple polygon centroid calculation
 function getPolygonCenter(pts) {
     let x = 0, y = 0;
     pts.forEach(p => {
@@ -521,7 +618,6 @@ function getPolygonCenter(pts) {
 // CHART.JS CONSTRUCTORS
 // ----------------------------------------------------
 function buildCharts(c) {
-    // 1. Funding Types (Doughnut)
     const fundingCtx = document.getElementById('fundingChart').getContext('2d');
     if (fundingChartInstance) fundingChartInstance.destroy();
     
@@ -551,7 +647,6 @@ function buildCharts(c) {
         }
     });
 
-    // 2. Room size Typologies (Bar)
     const typoCtx = document.getElementById('typologyChart').getContext('2d');
     if (typologyChartInstance) typologyChartInstance.destroy();
     

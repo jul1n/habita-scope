@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CartoLogement - Île-de-France</title>
+    <title>CartoLogement - France</title>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,7 +28,7 @@
                 <span class="logo-icon">🏢</span>
                 <div class="logo-text">
                     <h1>CartoLogement</h1>
-                    <p>Observatoire & Simulateur - Île-de-France (V1)</p>
+                    <p>Observatoire & Simulateur - France (V1)</p>
                 </div>
             </div>
             <div class="header-stats">
@@ -68,14 +68,7 @@
                         <label for="filter-dep">Département</label>
                         <select id="filter-dep" onchange="applyFilters()">
                             <option value="">Tous les départements</option>
-                            <option value="75">75 - Paris</option>
-                            <option value="77">77 - Seine-et-Marne</option>
-                            <option value="78">78 - Yvelines</option>
-                            <option value="91">91 - Essonne</option>
-                            <option value="92">92 - Hauts-de-Seine</option>
-                            <option value="93">93 - Seine-Saint-Denis</option>
-                            <option value="94">94 - Val-de-Marne</option>
-                            <option value="95">95 - Val-d'Oise</option>
+                            <option value="75" selected>75 - Paris</option>
                         </select>
                     </div>
 
@@ -239,7 +232,7 @@
                 <div id="map"></div>
                 <div id="map-loading" class="map-overlay">
                     <div class="spinner"></div>
-                    <p>Chargement de la carte et des communes d'Île-de-France...</p>
+                    <p>Chargement de la carte et des communes de France...</p>
                 </div>
             </section>
 

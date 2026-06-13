@@ -1,34 +1,64 @@
 {
   "annee": 2024,
   "social": {
-    "zone_sociale": "Ile-de-France",
-    "plafonds": {
-      "PLAI": {
-        "1_personne": 14329,
-        "2_personnes": 23371,
-        "3_personnes": 30635,
-        "4_personnes": 33534,
-        "5_personnes": 39898,
-        "6_personnes": 44899,
-        "par_personne_supp": 4573
+    "zones": {
+      "IDF": {
+        "PLAI": {
+          "1_personne": 14329,
+          "2_personnes": 23371,
+          "3_personnes": 30635,
+          "4_personnes": 33534,
+          "5_personnes": 39898,
+          "6_personnes": 44899,
+          "par_personne_supp": 4573
+        },
+        "PLUS": {
+          "1_personne": 26044,
+          "2_personnes": 38952,
+          "3_personnes": 46823,
+          "4_personnes": 56532,
+          "5_personnes": 66496,
+          "6_personnes": 74832,
+          "par_personne_supp": 8319
+        },
+        "PLS": {
+          "1_personne": 33857,
+          "2_personnes": 50638,
+          "3_personnes": 60870,
+          "4_personnes": 73492,
+          "5_personnes": 86445,
+          "6_personnes": 97282,
+          "par_personne_supp": 10815
+        }
       },
-      "PLUS": {
-        "1_personne": 26044,
-        "2_personnes": 38952,
-        "3_personnes": 46823,
-        "4_personnes": 56532,
-        "5_personnes": 66496,
-        "6_personnes": 74832,
-        "par_personne_supp": 8319
-      },
-      "PLS": {
-        "1_personne": 33857,
-        "2_personnes": 50638,
-        "3_personnes": 60870,
-        "4_personnes": 73492,
-        "5_personnes": 86445,
-        "6_personnes": 97282,
-        "par_personne_supp": 10815
+      "province": {
+        "PLAI": {
+          "1_personne": 12452,
+          "2_personnes": 16670,
+          "3_personnes": 20042,
+          "4_personnes": 22849,
+          "5_personnes": 26868,
+          "6_personnes": 33086,
+          "par_personne_supp": 3689
+        },
+        "PLUS": {
+          "1_personne": 22642,
+          "2_personnes": 30238,
+          "3_personnes": 36362,
+          "4_personnes": 43899,
+          "5_personnes": 51641,
+          "6_personnes": 58200,
+          "par_personne_supp": 6492
+        },
+        "PLS": {
+          "1_personne": 29435,
+          "2_personnes": 39309,
+          "3_personnes": 47271,
+          "4_personnes": 57069,
+          "5_personnes": 67133,
+          "6_personnes": 75660,
+          "par_personne_supp": 8440
+        }
       }
     }
   },
