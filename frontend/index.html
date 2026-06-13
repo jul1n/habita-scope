@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CartoLogement - Île-de-France</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- MapLibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <span class="logo-icon">🏢</span>
+                <div class="logo-text">
+                    <h1>CartoLogement</h1>
+                    <p>Observatoire & Simulateur - Île-de-France (V1)</p>
+                </div>
+            </div>
+            <div class="header-stats">
+                <div class="stat-badge">
+                    <span class="stat-label">Communes</span>
+                    <span id="stat-communes" class="stat-val">-</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="stat-label">Logements Sociaux</span>
+                    <span id="stat-logements" class="stat-val">-</span>
+                </div>
+                <div class="stat-badge">
+                    <span class="stat-label">Tension Moyenne</span>
+                    <span id="stat-tension" class="stat-val">-</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <main class="app-layout">
+            <!-- Sidebar Panel: Filters & Simulator -->
+            <aside class="sidebar">
+                <!-- Tabs for switching between Filters and Simulator -->
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('filters')">🔎 Filtres & Cartographie</button>
+                    <button class="tab-btn" onclick="switchTab('simulator')">🧮 Simulateur Ménage</button>
+                </div>
+
+                <!-- Tab Content: Filters -->
+                <div id="tab-filters" class="tab-content active">
+                    <div class="section-title">
+                        <h3>Filtrer les communes</h3>
+                        <p>Ajustez les critères pour afficher les données sur la carte</p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="filter-dep">Département</label>
+                        <select id="filter-dep" onchange="applyFilters()">
+                            <option value="">Tous les départements</option>
+                            <option value="75">75 - Paris</option>
+                            <option value="77">77 - Seine-et-Marne</option>
+                            <option value="78">78 - Yvelines</option>
+                            <option value="91">91 - Essonne</option>
+                            <option value="92">92 - Hauts-de-Seine</option>
+                            <option value="93">93 - Seine-Saint-Denis</option>
+                            <option value="94">94 - Val-de-Marne</option>
+                            <option value="95">95 - Val-d'Oise</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="filter-abc">Zone réglementaire (ABC)</label>
+                        <select id="filter-abc" onchange="applyFilters()">
+                            <option value="">Toutes les zones</option>
+                            <option value="A bis">Zone A bis (Très tendue)</option>
+                            <option value="A">Zone A (Tendue)</option>
+                            <option value="B1">Zone B1 (Intermédiaire)</option>
+                            <option value="B2">Zone B2 (Régional)</option>
+                            <option value="C">Zone C (Détendue)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="filter-tension">Tension locale (Demandes / Attributions)</label>
+                        <select id="filter-tension" onchange="applyFilters()">
+                            <option value="">Toutes tensions</option>
+                            <option value="faible">Faible (< 5)</option>
+                            <option value="moderee">Modérée (5 - 15)</option>
+                            <option value="forte">Forte (15 - 30)</option>
+                            <option value="critique">Critique (30+)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Coloration de la carte</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="map-color" value="tension" checked onchange="updateMapColoration()">
+                                <span>Tension locale</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="map-color" value="social_share" onchange="updateMapColoration()">
+                                <span>Part de Log. Sociaux</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="map-color" value="loyer" onchange="updateMapColoration()">
+                                <span>Loyer privé (€/m²)</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="legend-box" id="map-legend">
+                        <h4>Légende : Tension locale</h4>
+                        <div class="legend-gradient tension-grad"></div>
+                        <div class="legend-labels">
+                            <span>Faible (1)</span>
+                            <span>Moyenne (10)</span>
+                            <span>Critique (30+)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Simulator -->
+                <div id="tab-simulator" class="tab-content">
+                    <div class="section-title">
+                        <h3>Simulateur d'éligibilité</h3>
+                        <p>Évaluez vos droits aux logements sociaux et intermédiaires</p>
+                    </div>
+
+                    <form id="simulator-form" onsubmit="runSimulation(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="sim-adults">Adultes</label>
+                                <input type="number" id="sim-adults" min="1" value="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="sim-children">Enfants</label>
+                                <input type="number" id="sim-children" min="0" value="0">
+                            </div>
+                        </div>
+
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="sim-handicap">
+                                <span>Pers. en situation de handicap (Surclassement)</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="sim-jeune-menage">
+                                <span>Jeune ménage (somme âges couple < 55 ans)</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="sim-parent-isole">
+                                <span>Famille monoparentale (Parent isolé)</span>
+                            </label>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sim-rfr">Revenu Fiscal de Référence annuel (RFR)</label>
+                            <div class="input-currency">
+                                <input type="number" id="sim-rfr" min="0" placeholder="Ex: 24000" required>
+                                <span class="currency-symbol">€</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sim-commune">Commune ciblée</label>
+                            <select id="sim-commune" required>
+                                <option value="">Recherche de commune...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sim-typo">Typologie souhaitée</label>
+                            <select id="sim-typo" required>
+                                <option value="T1">T1 / Studio</option>
+                                <option value="T2" selected>T2 - 2 pièces</option>
+                                <option value="T3">T3 - 3 pièces</option>
+                                <option value="T4">T4 - 4 pièces</option>
+                                <option value="T5+">T5 et plus</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="submit-btn">Calculer l'éligibilité ⚡</button>
+                    </form>
+
+                    <!-- Simulation Result Display Area -->
+                    <div id="simulation-result" class="simulation-result-box hidden">
+                        <h4>Résultats de la simulation</h4>
+                        
+                        <div class="eligibility-badges">
+                            <div class="badge" id="badge-plai">
+                                <span class="badge-icon">❌</span>
+                                <span class="badge-name">PLAI (Très social)</span>
+                            </div>
+                            <div class="badge" id="badge-plus">
+                                <span class="badge-icon">❌</span>
+                                <span class="badge-name">PLUS (HLM classique)</span>
+                            </div>
+                            <div class="badge" id="badge-pls">
+                                <span class="badge-icon">❌</span>
+                                <span class="badge-name">PLS (Social sup)</span>
+                            </div>
+                            <div class="badge" id="badge-lli">
+                                <span class="badge-icon">❌</span>
+                                <span class="badge-name">LLI (Intermédiaire)</span>
+                            </div>
+                        </div>
+                        
+                        <div class="result-text" id="result-comment">
+                            <!-- Comment injected dynamically -->
+                        </div>
+                        
+                        <div class="ceilings-summary">
+                            <h5>Détails des plafonds calculés :</h5>
+                            <ul>
+                                <li>Plafond PLAI : <span id="ceil-plai">-</span> €</li>
+                                <li>Plafond PLUS : <span id="ceil-plus">-</span> €</li>
+                                <li>Plafond PLS : <span id="ceil-pls">-</span> €</li>
+                                <li>Plafond LLI : <span id="ceil-lli">-</span> €</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Map Area -->
+            <section class="map-container">
+                <div id="map"></div>
+                <div id="map-loading" class="map-overlay">
+                    <div class="spinner"></div>
+                    <p>Chargement de la carte et des communes d'Île-de-France...</p>
+                </div>
+            </section>
+
+            <!-- Right Panel: Commune Details / Information Sheet -->
+            <aside class="details-panel hidden" id="details-panel">
+                <button class="close-panel-btn" onclick="closeDetailsPanel()">×</button>
+                <div class="panel-scroll">
+                    <div class="commune-title">
+                        <h2 id="det-nom">Commune</h2>
+                        <span class="badge-zone" id="det-zone">Zone A bis</span>
+                    </div>
+                    
+                    <div class="commune-meta">
+                        <p><strong>Code INSEE :</strong> <span id="det-code">-</span></p>
+                        <p><strong>Département :</strong> <span id="det-dep">-</span></p>
+                        <p><strong>EPCI :</strong> <span id="det-epci">-</span></p>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="num" id="det-sociaux">-</span>
+                            <span class="lbl">Logements Sociaux</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="num" id="det-ratio">-</span>
+                            <span class="lbl">Demandes pour 1 attribution</span>
+                        </div>
+                    </div>
+
+                    <div class="section-title-sub">
+                        <h4>Tension et Attribution (2024)</h4>
+                    </div>
+                    <div class="commune-tension-details">
+                        <p>Demandes en cours : <strong id="det-demandes">-</strong></p>
+                        <p>Attributions annuelles : <strong id="det-attributions">-</strong></p>
+                        <p>Statut loi SRU : <span id="det-sru" class="sru-status">-</span></p>
+                    </div>
+
+                    <div class="section-title-sub">
+                        <h4>Répartition par Financement</h4>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="fundingChart"></canvas>
+                    </div>
+
+                    <div class="section-title-sub">
+                        <h4>Répartition des Logements par Typologie</h4>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="typologyChart"></canvas>
+                    </div>
+
+                    <div class="section-title-sub">
+                        <h4>Comparaison des Loyers Moyens théoriques</h4>
+                    </div>
+                    <div class="rent-comparison">
+                        <div class="rent-bar">
+                            <div class="rent-bar-label">Loyer Privé Estimé</div>
+                            <div class="rent-bar-value"><span id="rent-prive">-</span> €/m²</div>
+                        </div>
+                        <div class="rent-bar social">
+                            <div class="rent-bar-label">Loyer PLUS Moyen (HLM)</div>
+                            <div class="rent-bar-value"><span id="rent-social">7.20</span> €/m²</div>
+                        </div>
+                        <p class="rent-info-text">Le loyer social PLUS est d'environ 6.50 à 8.00 €/m² en IDF hors charges. Le loyer LLI (intermédiaire) est plafonné à environ 15 à 19 €/m² selon la zone.</p>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Custom Logic -->
+    <script src="app.js"></script>
+</body>
+</html>

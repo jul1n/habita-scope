@@ -1,0 +1,84 @@
+{
+  "annee": 2024,
+  "social": {
+    "zone_sociale": "Ile-de-France",
+    "plafonds": {
+      "PLAI": {
+        "1_personne": 14329,
+        "2_personnes": 23371,
+        "3_personnes": 30635,
+        "4_personnes": 33534,
+        "5_personnes": 39898,
+        "6_personnes": 44899,
+        "par_personne_supp": 4573
+      },
+      "PLUS": {
+        "1_personne": 26044,
+        "2_personnes": 38952,
+        "3_personnes": 46823,
+        "4_personnes": 56532,
+        "5_personnes": 66496,
+        "6_personnes": 74832,
+        "par_personne_supp": 8319
+      },
+      "PLS": {
+        "1_personne": 33857,
+        "2_personnes": 50638,
+        "3_personnes": 60870,
+        "4_personnes": 73492,
+        "5_personnes": 86445,
+        "6_personnes": 97282,
+        "par_personne_supp": 10815
+      }
+    }
+  },
+  "intermediaire_lli": {
+    "zones": {
+      "A_bis": {
+        "1_personne": 43475,
+        "2_personnes": 64976,
+        "3_personnes": 80816,
+        "4_personnes": 93556,
+        "5_personnes": 110753,
+        "6_personnes": 124630,
+        "par_personne_supp": 13886
+      },
+      "A": {
+        "1_personne": 43475,
+        "2_personnes": 64976,
+        "3_personnes": 80816,
+        "4_personnes": 93556,
+        "5_personnes": 110753,
+        "6_personnes": 124630,
+        "par_personne_supp": 13886
+      },
+      "B1": {
+        "1_personne": 35435,
+        "2_personnes": 47321,
+        "3_personnes": 56905,
+        "4_personnes": 68699,
+        "5_personnes": 80816,
+        "6_personnes": 91078,
+        "par_personne_supp": 10161
+      },
+      "B2": {
+        "1_personne": 31892,
+        "2_personnes": 42588,
+        "3_personnes": 51215,
+        "4_personnes": 61830,
+        "5_personnes": 72735,
+        "6_personnes": 82043,
+        "par_personne_supp": 9142
+      },
+      "C": {
+        "1_personne": 31892,
+        "2_personnes": 42588,
+        "3_personnes": 51215,
+        "4_personnes": 61830,
+        "5_personnes": 72735,
+        "6_personnes": 82043,
+        "par_personne_supp": 9142
+      }
+    }
+  }
+}
