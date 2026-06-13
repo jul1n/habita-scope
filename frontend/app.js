@@ -182,10 +182,10 @@ async function loadDepartmentGeometry(depCode) {
                 unmatched++;
             }
             
-            // Pre-calculate colors for MapLibre paint layers to avoid compiler errors
-            f.properties.color_tension = getTensionColor(f.properties.demandes_total, f.properties.ratio_demandes_attributions);
-            f.properties.color_social = getSocialShareColor(f.properties.logements_sociaux_total);
-            f.properties.color_loyer = getLoyerColor(f.properties.loyer_prive_m2);
+            // Pre-calculate status strings for MapLibre match expressions
+            f.properties.tension_status = getTensionStatus(f.properties.demandes_total, f.properties.ratio_demandes_attributions);
+            f.properties.social_status = getSocialStatus(f.properties.logements_sociaux_total);
+            f.properties.loyer_status = getLoyerStatus(f.properties.loyer_prive_m2);
         });
         
         console.log(`GeoJSON join results for ${depCode}: Matched ${matched} communes, Unmatched ${unmatched} communes.`);
@@ -368,38 +368,63 @@ function initMap() {
 // ----------------------------------------------------
 // THEMATIC COLOR MAP EXPRESSIONS
 // ----------------------------------------------------
-function getTensionColor(demandes, ratio) {
-    if (!demandes || demandes === 0) return '#334155';
-    if (ratio < 5) return '#4ade80';
-    if (ratio < 15) return '#a3e635';
-    if (ratio < 30) return '#f59e0b';
-    if (ratio < 60) return '#f97316';
-    if (ratio < 120) return '#ef4444';
-    return '#b91c1c';
+function getTensionStatus(demandes, ratio) {
+    if (!demandes || demandes === 0) return 'nodata';
+    if (ratio < 5) return 'faible';
+    if (ratio < 15) return 'moderee';
+    if (ratio < 30) return 'forte';
+    if (ratio < 60) return 'critique';
+    return 'danger';
 }
 
-function getSocialShareColor(total) {
-    if (!total || total === 0) return '#1e293b';
-    if (total < 100) return '#6366f1';
-    if (total < 500) return '#4f46e5';
-    if (total < 2500) return '#4338ca';
-    return '#38bdf8';
+function getSocialStatus(total) {
+    if (!total || total === 0) return 'empty';
+    if (total < 100) return 'low';
+    if (total < 500) return 'medium_low';
+    if (total < 2500) return 'medium_high';
+    return 'high';
 }
 
-function getLoyerColor(loyer) {
-    if (!loyer) return '#10b981';
-    if (loyer < 13) return '#10b981';
-    if (loyer < 20) return '#f59e0b';
-    return '#ec4899';
+function getLoyerStatus(loyer) {
+    if (!loyer) return 'eco';
+    if (loyer < 13) return 'eco';
+    if (loyer < 20) return 'medium';
+    return 'high';
 }
 
 function getMapColorExpression(mode) {
     if (mode === 'tension') {
-        return ['coalesce', ['get', 'color_tension'], '#334155'];
+        return [
+            'match',
+            ['coalesce', ['get', 'tension_status'], 'nodata'],
+            'nodata', '#334155',
+            'faible', '#4ade80',
+            'moderee', '#a3e635',
+            'forte', '#f59e0b',
+            'critique', '#f97316',
+            'danger', '#ef4444',
+            '#334155'
+        ];
     } else if (mode === 'social_share') {
-        return ['coalesce', ['get', 'color_social'], '#1e293b'];
+        return [
+            'match',
+            ['coalesce', ['get', 'social_status'], 'empty'],
+            'empty', '#1e293b',
+            'low', '#6366f1',
+            'medium_low', '#4f46e5',
+            'medium_high', '#4338ca',
+            'high', '#38bdf8',
+            '#1e293b'
+        ];
     } else if (mode === 'loyer') {
-        return ['coalesce', ['get', 'color_loyer'], '#10b981'];
+        return [
+            'match',
+            ['coalesce', ['get', 'loyer_status'], 'eco'],
+            'eco', '#10b981',
+            'medium', '#f59e0b',
+            'high', '#ec4899',
+            '#10b981'
+        ];
     }
 }
 
