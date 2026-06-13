@@ -73,6 +73,14 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="search-commune">Rechercher une commune</label>
+                        <div class="autocomplete-container">
+                            <input type="text" id="search-commune" placeholder="Ex: Lille, Lyon, Marseille..." autocomplete="off">
+                            <div id="search-suggestions" class="suggestions-box hidden"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
                         <label for="filter-abc">Zone réglementaire (ABC)</label>
                         <select id="filter-abc" onchange="applyFilters()">
                             <option value="">Toutes les zones</option>

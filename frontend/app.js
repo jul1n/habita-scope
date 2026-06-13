@@ -58,6 +58,9 @@ async function initApp() {
         
         // 3. Initialize MapLibre
         initMap();
+        
+        // 4. Initialize Autocomplete Search Bar
+        initAutocompleteSearch();
     } catch (err) {
         console.error("Error during application initialization:", err);
         alert("Erreur lors de l'initialisation de l'application. Vérifiez que l'API backend tourne.");
@@ -757,6 +760,70 @@ function buildCharts(c) {
                 x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 9 } } },
                 y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#94a3b8', font: { size: 9 } } }
             }
+        }
+    });
+}
+
+// ----------------------------------------------------
+// AUTOCOMPLETE SEARCH LOGIC
+// ----------------------------------------------------
+function initAutocompleteSearch() {
+    const searchInput = document.getElementById("search-commune");
+    const suggestionsBox = document.getElementById("search-suggestions");
+    
+    if (!searchInput || !suggestionsBox) return;
+    
+    searchInput.addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        suggestionsBox.innerHTML = '';
+        
+        if (query.length < 2) {
+            suggestionsBox.classList.add("hidden");
+            return;
+        }
+        
+        // Filter communes (remove accents from commune name for comparison to handle queries like "aix" or "orleans" easily)
+        const matches = communesData
+            .filter(c => {
+                const normName = c.nom_commune.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return normName.includes(query) || c.code_commune.includes(query);
+            })
+            .slice(0, 10);
+            
+        if (matches.length === 0) {
+            suggestionsBox.classList.add("hidden");
+            return;
+        }
+        
+        matches.forEach(c => {
+            const div = document.createElement("div");
+            div.className = "suggestion-item";
+            div.innerText = `${c.nom_commune} (${c.departement})`;
+            div.addEventListener("click", () => {
+                searchInput.value = c.nom_commune;
+                suggestionsBox.classList.add("hidden");
+                
+                // Switch department and load geometry if different
+                const depSelect = document.getElementById("filter-dep");
+                if (depSelect.value !== c.departement) {
+                    depSelect.value = c.departement;
+                    loadDepartmentGeometry(c.departement).then(() => {
+                        showCommuneDetails(c.code_commune);
+                    });
+                } else {
+                    showCommuneDetails(c.code_commune);
+                }
+            });
+            suggestionsBox.appendChild(div);
+        });
+        
+        suggestionsBox.classList.remove("hidden");
+    });
+    
+    // Close suggestions when clicking outside
+    document.addEventListener("click", (e) => {
+        if (e.target !== searchInput && e.target !== suggestionsBox) {
+            suggestionsBox.classList.add("hidden");
         }
     });
 }
