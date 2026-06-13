@@ -154,23 +154,32 @@ async function loadDepartmentGeometry(depCode) {
         
         // Join tabular indicators with GeoJSON properties
         const indicatorsMap = {};
+        let dataCount = 0;
         communesData.forEach(c => {
             if (c.departement === depCode) {
                 indicatorsMap[c.code_commune] = c;
+                dataCount++;
             }
         });
+        
+        console.log(`Department ${depCode}: Found ${dataCount} communes in database list.`);
+        
+        let matched = 0;
+        let unmatched = 0;
         
         communesGeoJSON.features.forEach(f => {
             const code = f.properties.code_commune;
             const data = indicatorsMap[code];
             if (data) {
                 f.properties = { ...f.properties, ...data };
+                matched++;
             } else {
                 f.properties.logements_sociaux_total = 0;
                 f.properties.demandes_total = 0;
                 f.properties.ratio_demandes_attributions = 0;
                 f.properties.loyer_prive_m2 = 12;
                 f.properties.nom_commune = "Inconnue";
+                unmatched++;
             }
             
             // Pre-calculate colors for MapLibre paint layers to avoid compiler errors
@@ -178,6 +187,8 @@ async function loadDepartmentGeometry(depCode) {
             f.properties.color_social = getSocialShareColor(f.properties.logements_sociaux_total);
             f.properties.color_loyer = getLoyerColor(f.properties.loyer_prive_m2);
         });
+        
+        console.log(`GeoJSON join results for ${depCode}: Matched ${matched} communes, Unmatched ${unmatched} communes.`);
 
         // Set source data
         const source = map.getSource('communes-idf');
@@ -187,6 +198,35 @@ async function loadDepartmentGeometry(depCode) {
         
         // Zoom and center map bounds to fit the loaded department
         fitMapToGeoJSON();
+        
+        // Update header stats for the selected department dynamically
+        if (!depCode && globalStats) {
+            document.getElementById("stat-communes").innerText = globalStats.total_communes.toLocaleString('fr-FR');
+            document.getElementById("stat-logements").innerText = globalStats.total_logements_sociaux.toLocaleString('fr-FR');
+            document.getElementById("stat-tension").innerText = `${globalStats.moyenne_tension.toFixed(1)} demandes / attrib.`;
+        } else {
+            let depTotalCommunes = 0;
+            let depTotalLogements = 0;
+            let depTotalTensionSum = 0;
+            let depTensionCommuneCount = 0;
+            
+            communesData.forEach(c => {
+                if (c.departement === depCode) {
+                    depTotalCommunes++;
+                    depTotalLogements += c.logements_sociaux_total || 0;
+                    if (c.demandes_total > 0) {
+                        depTotalTensionSum += c.ratio_demandes_attributions || 0;
+                        depTensionCommuneCount++;
+                    }
+                }
+            });
+            
+            const avgTension = depTensionCommuneCount > 0 ? (depTotalTensionSum / depTensionCommuneCount).toFixed(1) : "N/A";
+            
+            document.getElementById("stat-communes").innerText = depTotalCommunes.toLocaleString('fr-FR');
+            document.getElementById("stat-logements").innerText = depTotalLogements.toLocaleString('fr-FR');
+            document.getElementById("stat-tension").innerText = depTensionCommuneCount > 0 ? `${avgTension} demandes / attrib.` : "N/A (Hors IdF)";
+        }
         
     } catch (e) {
         console.error("Failed to load department geometry:", e);
