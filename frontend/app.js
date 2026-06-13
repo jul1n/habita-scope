@@ -172,6 +172,11 @@ async function loadDepartmentGeometry(depCode) {
                 f.properties.loyer_prive_m2 = 12;
                 f.properties.nom_commune = "Inconnue";
             }
+            
+            // Pre-calculate colors for MapLibre paint layers to avoid compiler errors
+            f.properties.color_tension = getTensionColor(f.properties.demandes_total, f.properties.ratio_demandes_attributions);
+            f.properties.color_social = getSocialShareColor(f.properties.logements_sociaux_total);
+            f.properties.color_loyer = getLoyerColor(f.properties.loyer_prive_m2);
         });
 
         // Set source data
@@ -323,36 +328,38 @@ function initMap() {
 // ----------------------------------------------------
 // THEMATIC COLOR MAP EXPRESSIONS
 // ----------------------------------------------------
+function getTensionColor(demandes, ratio) {
+    if (!demandes || demandes === 0) return '#334155';
+    if (ratio < 5) return '#4ade80';
+    if (ratio < 15) return '#a3e635';
+    if (ratio < 30) return '#f59e0b';
+    if (ratio < 60) return '#f97316';
+    if (ratio < 120) return '#ef4444';
+    return '#b91c1c';
+}
+
+function getSocialShareColor(total) {
+    if (!total || total === 0) return '#1e293b';
+    if (total < 100) return '#6366f1';
+    if (total < 500) return '#4f46e5';
+    if (total < 2500) return '#4338ca';
+    return '#38bdf8';
+}
+
+function getLoyerColor(loyer) {
+    if (!loyer) return '#10b981';
+    if (loyer < 13) return '#10b981';
+    if (loyer < 20) return '#f59e0b';
+    return '#ec4899';
+}
+
 function getMapColorExpression(mode) {
     if (mode === 'tension') {
-        return [
-            'case',
-            ['==', ['coalesce', ['get', 'demandes_total'], 0], 0], '#334155',
-            ['<', ['get', 'ratio_demandes_attributions'], 5], '#4ade80',
-            ['<', ['get', 'ratio_demandes_attributions'], 15], '#a3e635',
-            ['<', ['get', 'ratio_demandes_attributions'], 30], '#f59e0b',
-            ['<', ['get', 'ratio_demandes_attributions'], 60], '#f97316',
-            ['<', ['get', 'ratio_demandes_attributions'], 120], '#ef4444',
-            '#b91c1c'
-        ];
+        return ['coalesce', ['get', 'color_tension'], '#334155'];
     } else if (mode === 'social_share') {
-        return [
-            'interpolate',
-            ['linear'],
-            ['get', 'logements_sociaux_total'],
-            0, '#1e293b',       // Deep grey (no social housing)
-            100, '#6366f1',     // Indigo
-            2500, '#38bdf8'     // Bright Blue (High volume)
-        ];
+        return ['coalesce', ['get', 'color_social'], '#1e293b'];
     } else if (mode === 'loyer') {
-        return [
-            'interpolate',
-            ['linear'],
-            ['get', 'loyer_prive_m2'],
-            10, '#10b981',   // Green (Inexpensive, ~11 €/m²)
-            18, '#f59e0b',   // Amber (~17-18 €/m²)
-            30, '#ec4899'    // Pink (High, 30+ €/m²)
-        ];
+        return ['coalesce', ['get', 'color_loyer'], '#10b981'];
     }
 }
 
