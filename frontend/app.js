@@ -93,6 +93,12 @@ function populateDepartmentDropdown() {
     const select = document.getElementById("filter-dep");
     select.innerHTML = ''; // Clear hardcoded ones
     
+    // Add "France entière" option
+    const allOpt = document.createElement("option");
+    allOpt.value = 'ALL';
+    allOpt.innerText = 'France entière (Ralentissement possible)';
+    select.appendChild(allOpt);
+    
     // Extract unique departments from the dataset
     const deps = [...new Set(communesData.map(c => c.departement))].sort((a, b) => a.localeCompare(b));
     
@@ -144,6 +150,11 @@ function switchTab(tabId) {
 // ----------------------------------------------------
 async function loadDepartmentGeometry(depCode) {
     if (!map) return;
+    
+    if (depCode === 'ALL') {
+        await loadAllFranceGeometry();
+        return;
+    }
     
     // Show loading spinner
     document.getElementById("map-loading").classList.remove("hidden");
@@ -236,6 +247,89 @@ async function loadDepartmentGeometry(depCode) {
         console.error("Failed to load department geometry:", e);
     } finally {
         document.getElementById("map-loading").classList.add("hidden");
+    }
+}
+
+async function loadAllFranceGeometry() {
+    if (!map) return;
+    
+    document.getElementById("map-loading").classList.remove("hidden");
+    const loadingText = document.getElementById("map-loading").querySelector("p");
+    loadingText.innerText = "Chargement de la France entière (peut prendre quelques secondes)...";
+    
+    try {
+        const deps = [...new Set(communesData.map(c => c.departement))].sort((a, b) => a.localeCompare(b));
+        
+        // Fetch all geojson files concurrently
+        const fetchPromises = deps.map(dep => 
+            fetch(`${API_BASE_URL}/communes/geojson/${dep}`)
+                .then(res => res.ok ? res.json() : null)
+                .catch(() => null)
+        );
+        
+        const results = await Promise.all(fetchPromises);
+        
+        // Combine all features
+        let allFeatures = [];
+        const indicatorsMap = {};
+        communesData.forEach(c => {
+            indicatorsMap[c.code_commune] = c;
+        });
+        
+        results.forEach(geojson => {
+            if (geojson && geojson.features) {
+                geojson.features.forEach(f => {
+                    const code = f.properties.code_commune;
+                    const data = indicatorsMap[code];
+                    if (data) {
+                        f.properties = { ...f.properties, ...data };
+                    } else {
+                        f.properties.logements_sociaux_total = 0;
+                        f.properties.demandes_total = 0;
+                        f.properties.ratio_demandes_attributions = 0;
+                        f.properties.loyer_prive_m2 = 12;
+                        f.properties.nom_commune = "Inconnue";
+                    }
+                    
+                    f.properties.tension_status = getTensionStatus(f.properties.demandes_total, f.properties.ratio_demandes_attributions);
+                    f.properties.social_status = getSocialStatus(f.properties.logements_sociaux_total);
+                    f.properties.loyer_status = getLoyerStatus(f.properties.loyer_prive_m2);
+                    f.properties.sru_status = getSRUStatus(f.properties.taux_sru);
+                });
+                allFeatures = allFeatures.concat(geojson.features);
+            }
+        });
+        
+        communesGeoJSON = {
+            type: 'FeatureCollection',
+            features: allFeatures
+        };
+        
+        const source = map.getSource('communes-idf');
+        if (source) {
+            source.setData(communesGeoJSON);
+        }
+        
+        // Center view on France
+        map.easeTo({
+            center: [2.2137, 46.2276],
+            zoom: 5.8,
+            duration: 1000
+        });
+        
+        // Update header stats for France entière
+        if (globalStats) {
+            document.getElementById("stat-communes").innerText = globalStats.total_communes.toLocaleString('fr-FR');
+            document.getElementById("stat-logements").innerText = globalStats.total_logements_sociaux.toLocaleString('fr-FR');
+            document.getElementById("stat-tension").innerText = `${globalStats.moyenne_tension.toFixed(1)} demandes / attrib.`;
+        }
+        
+    } catch (e) {
+        console.error("Failed to load France geometry:", e);
+        alert("Erreur lors du chargement de la France entière.");
+    } finally {
+        document.getElementById("map-loading").classList.add("hidden");
+        loadingText.innerText = "Chargement de la carte et des communes de France...";
     }
 }
 
