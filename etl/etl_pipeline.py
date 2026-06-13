@@ -43,7 +43,7 @@ def run_etl():
     # 1. Load Zonage ABC
     print("1/6 Loading ABC Zoning...")
     abc_path = glob.glob(f"{sources_dir}/liste-des-communes-zonage-abc-5-septembre-2025.csv")[0]
-    df_abc = pd.read_csv(abc_path, sep=';', encoding='latin1')
+    df_abc = pd.read_csv(abc_path, sep=';', encoding='utf-8')
     # CODGEO;DEP;LIBGEO;Zonage en vigueur depuis le 5 septembre 2025
     df_abc['code_commune'] = df_abc['CODGEO'].astype(str).str.zfill(5)
     df_abc['departement'] = df_abc['DEP'].astype(str).str.zfill(2)
@@ -177,7 +177,7 @@ def run_etl():
     # 5. Load GeoJSON Communes (simplify coordinates to round 5 to save space)
     print("5/6 Loading and simplifying GeoJSON communes...")
     geojson_path = glob.glob(f"{sources_dir}/communes-5m.geojson")[0]
-    with open(geojson_path, 'r', encoding='utf-8') as f:
+    with open(geojson_path, 'r', encoding='latin1') as f:
         geo_data = json.load(f)
         
     filtered_features = []

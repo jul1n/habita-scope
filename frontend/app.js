@@ -236,10 +236,13 @@ function getMapColorExpression(mode) {
             'interpolate',
             ['linear'],
             ['get', 'ratio_demandes_attributions'],
-            0, '#4ade80',    // Green (Low tension)
+            0, '#4ade80',    // Vert (Faible tension: < 5)
             5, '#4ade80',
-            15, '#f59e0b',   // Orange (Moderate tension)
-            30, '#ef4444'    // Red (High/critical tension)
+            15, '#a3e635',   // Vert-Jaune (5 - 15)
+            30, '#f59e0b',   // Orange (15 - 30)
+            60, '#f97316',   // Orange foncé (30 - 60)
+            120, '#ef4444',  // Rouge (60 - 120)
+            200, '#b91c1c'   // Rouge foncé (120+)
         ];
     } else if (mode === 'social_share') {
         return [
@@ -278,7 +281,7 @@ function updateMapColoration() {
         if (colorMode === 'tension') {
             title.innerText = "Légende : Tension locale";
             grad.classList.add("tension-grad");
-            labels.innerHTML = '<span>Faible (1)</span><span>Moyenne (15)</span><span>Critique (30+)</span>';
+            labels.innerHTML = '<span>Faible (< 5)</span><span>Moyenne (30)</span><span>Critique (120+)</span>';
         } else if (colorMode === 'social_share') {
             title.innerText = "Légende : Logements Sociaux";
             grad.classList.add("social-grad");
