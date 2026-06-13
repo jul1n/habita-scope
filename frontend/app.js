@@ -186,6 +186,7 @@ async function loadDepartmentGeometry(depCode) {
             f.properties.tension_status = getTensionStatus(f.properties.demandes_total, f.properties.ratio_demandes_attributions);
             f.properties.social_status = getSocialStatus(f.properties.logements_sociaux_total);
             f.properties.loyer_status = getLoyerStatus(f.properties.loyer_prive_m2);
+            f.properties.sru_status = getSRUStatus(f.properties.taux_sru);
         });
         
         console.log(`GeoJSON join results for ${depCode}: Matched ${matched} communes, Unmatched ${unmatched} communes.`);
@@ -368,6 +369,14 @@ function initMap() {
 // ----------------------------------------------------
 // THEMATIC COLOR MAP EXPRESSIONS
 // ----------------------------------------------------
+function getSRUStatus(taux) {
+    if (taux === null || taux === undefined) return 'nodata';
+    if (taux < 0.10) return 'insufficient'; // < 10%
+    if (taux < 0.20) return 'warning';      // 10% - 20%
+    if (taux < 0.25) return 'almost';       // 20% - 25%
+    return 'ok';                            // >= 25%
+}
+
 function getTensionStatus(demandes, ratio) {
     if (!demandes || demandes === 0) return 'nodata';
     if (ratio < 5) return 'faible';
@@ -453,6 +462,10 @@ function updateMapColoration() {
             title.innerText = "Légende : Loyer privé (€/m²)";
             grad.classList.add("loyer-grad");
             labels.innerHTML = '<span>Économique (11€)</span><span>Moyen (18€)</span><span>Élevé (30€+)</span>';
+        } else if (colorMode === 'sru_rate') {
+            title.innerText = "Légende : Taux de Log. Sociaux (SRU)";
+            grad.classList.add("sru-rate-grad");
+            labels.innerHTML = '<div style="display: flex; justify-content: space-between; width: 100%;"><span>Déficitaire (&lt;10%)</span><span>Moyen (15%)</span><span>Conforme (25%+)</span></div><div style="text-align: center; margin-top: 6px; color: #94a3b8; font-size: 9px;">⬜ Gris : Non concerné ou Données indisponibles</div>';
         }
     }
 }

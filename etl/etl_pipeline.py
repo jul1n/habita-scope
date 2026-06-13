@@ -76,7 +76,7 @@ def run_etl():
     def clean_taux_sru(val):
         if pd.isna(val):
             return None
-        val_str = str(val).replace(',', '.').replace('%', '').strip()
+        val_str = str(val).replace(',', '.').replace('%', '').replace('>', '').replace('<', '').replace('=', '').strip()
         try:
             return float(val_str) / 100.0
         except ValueError:
