@@ -167,6 +167,7 @@ async function loadDepartmentGeometry(depCode) {
                 f.properties = { ...f.properties, ...data };
             } else {
                 f.properties.logements_sociaux_total = 0;
+                f.properties.demandes_total = 0;
                 f.properties.ratio_demandes_attributions = 0;
                 f.properties.loyer_prive_m2 = 12;
                 f.properties.nom_commune = "Inconnue";
@@ -326,19 +327,13 @@ function getMapColorExpression(mode) {
     if (mode === 'tension') {
         return [
             'case',
-            ['==', ['get', 'demandes_total'], 0], '#334155',
-            [
-                'interpolate',
-                ['linear'],
-                ['get', 'ratio_demandes_attributions'],
-                0, '#4ade80',    // Vert (Faible tension: < 5)
-                5, '#4ade80',
-                15, '#a3e635',   // Vert-Jaune (5 - 15)
-                30, '#f59e0b',   // Orange (15 - 30)
-                60, '#f97316',   // Orange foncé (30 - 60)
-                120, '#ef4444',  // Rouge (60 - 120)
-                200, '#b91c1c'   // Rouge foncé (120+)
-            ]
+            ['==', ['coalesce', ['get', 'demandes_total'], 0], 0], '#334155',
+            ['<', ['get', 'ratio_demandes_attributions'], 5], '#4ade80',
+            ['<', ['get', 'ratio_demandes_attributions'], 15], '#a3e635',
+            ['<', ['get', 'ratio_demandes_attributions'], 30], '#f59e0b',
+            ['<', ['get', 'ratio_demandes_attributions'], 60], '#f97316',
+            ['<', ['get', 'ratio_demandes_attributions'], 120], '#ef4444',
+            '#b91c1c'
         ];
     } else if (mode === 'social_share') {
         return [
