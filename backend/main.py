@@ -1,3 +1,4 @@
+import re
 import os
 import json
 from functools import lru_cache
@@ -101,7 +102,7 @@ class SimulationInput(BaseModel):
     parent_isole: bool = Field(False, description="Parent isolé (famille monoparentale)")
     revenu_fiscal: float = Field(..., ge=0, description="Revenu Fiscal de Référence annuel en €")
     code_commune: str = Field(..., description="Code INSEE de la commune souhaitée")
-    typologie: str = Field("T2", description="Typologie recherchée (T1, T2, T3, T4, T5+)")
+    typologie: str = Field("T2", pattern=r"^T[1-5]\+?$", description="Typologie recherchée (T1, T2, T3, T4, T5+)")
 
 class EligibilityResult(BaseModel):
     eligible_plai: bool
@@ -128,12 +129,15 @@ app = FastAPI(
 )
 
 # Enable CORS for frontend integration
+# Origines autorisées (séparées par des virgules). L'API est publique et sans cookie :
+# pas de credentials, méthodes limitées à ce qu'elle expose réellement.
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 # Helper function to convert DB Row to Dict
@@ -164,11 +168,20 @@ def load_geojson_file(path: str):
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
+_DEP_RE = re.compile(r"^(\d{2,3}|2[AB])$", re.IGNORECASE)
+
+def _clean_dep(dep_code: str) -> str:
+    """Code département strict (01-95, 2A/2B, 971-976) : refuse tout autre format."""
+    dep = dep_code.zfill(2)
+    if not _DEP_RE.match(dep):
+        raise HTTPException(status_code=400, detail="Code département invalide.")
+    return dep.upper()
+
 @app.get("/communes/geojson/{dep_code}")
 def get_communes_geojson(dep_code: str, response: Response):
     """Retourne la géométrie simplifiée de toutes les communes d'un département."""
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    dep_clean = dep_code.zfill(2)
+    dep_clean = _clean_dep(dep_code)
     geojson_path = os.path.abspath(os.path.join(backend_dir, f"../processed/geometries/{dep_clean}.geojson"))
     data = load_geojson_file(geojson_path)
     if data is None:
@@ -179,7 +192,7 @@ def get_communes_geojson(dep_code: str, response: Response):
 def get_grid_geojson(dep_code: str, response: Response):
     """Retourne les carreaux Filosofi 1km pour un département."""
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    dep_clean = dep_code.zfill(2)
+    dep_clean = _clean_dep(dep_code)
     geojson_path = os.path.abspath(os.path.join(backend_dir, f"../processed/geometries/grid_{dep_clean}.geojson"))
     data = load_geojson_file(geojson_path)
     if data is None:
