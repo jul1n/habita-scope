@@ -131,7 +131,7 @@ app = FastAPI(
 # Enable CORS for frontend integration
 # Origines autorisées (séparées par des virgules). L'API est publique et sans cookie :
 # pas de credentials, méthodes limitées à ce qu'elle expose réellement.
-ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost").split(",") if o.strip()]
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost,http://127.0.0.1").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,

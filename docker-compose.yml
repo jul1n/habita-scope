@@ -25,8 +25,11 @@ services:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/logement
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
-    # Exposé uniquement à nginx (réseau Docker) ; ajouter "127.0.0.1:8000:8000" pour le debug local.
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://127.0.0.1}
+    # Publié sur la boucle locale uniquement : le front (en localhost) appelle http://127.0.0.1:8000,
+    # mais l'API n'est pas joignable depuis internet. En production, nginx la relaie en interne.
+    ports:
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./processed:/processed
 
