@@ -102,7 +102,7 @@ class SimulationInput(BaseModel):
     parent_isole: bool = Field(False, description="Parent isolé (famille monoparentale)")
     revenu_fiscal: float = Field(..., ge=0, description="Revenu Fiscal de Référence annuel en €")
     code_commune: str = Field(..., description="Code INSEE de la commune souhaitée")
-    typologie: str = Field("T2", pattern=r"^T[1-5]\+?$", description="Typologie recherchée (T1, T2, T3, T4, T5+)")
+    typologie: str = Field("T2", pattern=r"^[Tt][1-5]\+?$", description="Typologie recherchée (T1, T2, T3, T4, T5+)")
 
 class EligibilityResult(BaseModel):
     eligible_plai: bool
